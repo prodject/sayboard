@@ -122,18 +122,8 @@ struct MicAnimatedButton: View {
       self.proxy.stopDictation()
     } else if self.keyboardState.isDictationLocked {
       if let url = DeepLink.unlockURL { self.proxy.openURL(url) }
-    } else if self.keyboardState.isSessionActive {
+    } else {
       self.proxy.startDictation()
-    } else if let url = DeepLink.dictateURL {
-      let settings = SharedSettings()
-      if OperatingSystem.isHostBundleIdBroken {
-        self.proxy.resolveHost()
-      }
-      settings.keyboardRequestedDictationAt = CFAbsoluteTimeGetCurrent()
-      settings.keyboardRequestedDictation = true
-      settings.dictationSessionToken = UUID().uuidString
-      settings.synchronize()
-      self.proxy.openURL(url)
     }
   }
 

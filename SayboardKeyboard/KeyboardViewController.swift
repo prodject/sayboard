@@ -266,6 +266,10 @@ final class KeyboardViewController: UIInputViewController {
       return
     }
     saveHostBundleId()
+    if !AppGroup.isAvailable {
+      self.openDictateDeepLinkFallback(reason: "App Group unavailable")
+      return
+    }
     let settings = SharedSettings()
     settings.synchronize()
 
@@ -304,7 +308,8 @@ final class KeyboardViewController: UIInputViewController {
     settings.synchronize()
     self.keyboardState.isSessionActive = false
     self.keyboardState.isProcessing = false
-    guard let url = DeepLink.dictateURL else { return }
+    let hostBundleId = settings.hostBundleId
+    guard let url = DeepLink.makeDictateURL(hostBundleId: hostBundleId) else { return }
     if let openAction = self.keyboardState.openURLAction {
       openAction(url)
     } else {

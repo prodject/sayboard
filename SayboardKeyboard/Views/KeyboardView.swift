@@ -189,9 +189,9 @@ struct KeyboardView: View {
   private var activeBlocker: SetupBlocker? {
     if !self.keyboardState.hasFullAccess {
       .fullAccessMissing
-    } else if !self.keyboardState.isMicrophoneAuthorized {
+    } else if AppGroup.isAvailable, !self.keyboardState.isMicrophoneAuthorized {
       .micDenied
-    } else if !self.keyboardState.hasUsableModel {
+    } else if AppGroup.isAvailable, !self.keyboardState.hasUsableModel {
       self.keyboardState.parakeetV3NeedsRedownload ? .modelRemovedByUpdate : .noModel
     } else {
       nil

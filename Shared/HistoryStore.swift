@@ -5,7 +5,7 @@ struct HistoryStore: Sendable {
   static let shared = Self()
 
   var audioDirectoryURL: URL? {
-    guard let container = AppGroup.containerURL else { return nil }
+    guard let container = AppGroup.storageContainerURL else { return nil }
     let audioDir = container.appendingPathComponent(self.audioDirectoryName)
     if !FileManager.default.fileExists(atPath: audioDir.path) {
       try? FileManager.default.createDirectory(
@@ -132,7 +132,7 @@ struct HistoryStore: Sendable {
   private let hoursInMonth = 720
 
   private var historyFileURL: URL? {
-    AppGroup.containerURL?.appendingPathComponent(self.historyFileName)
+    AppGroup.storageContainerURL?.appendingPathComponent(self.historyFileName)
   }
 
   private func writeRecords(_ records: [HistoryRecord]) {

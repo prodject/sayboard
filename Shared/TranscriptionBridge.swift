@@ -1,37 +1,49 @@
 import Foundation
+import UIKit
 
 struct TranscriptionBridge: Sendable {
 
+  @MainActor
   static func writeTranscription(_ text: String) {
-    guard let url = transcriptionFileURL else {
-      return
-    }
-    do {
-      try Data(text.utf8).write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
-      DiagnosticLog.write("bridge: wrote \(text.count) chars")
-    } catch {
-      DiagnosticLog.write("bridge: WRITE FAILED: \(error.localizedDescription)")
+    if let url = transcriptionFileURL {
+      do {
+        try Data(text.utf8).write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+        DiagnosticLog.write("bridge: wrote \(text.count) chars")
+      } catch {
+        DiagnosticLog.write("bridge: WRITE FAILED: \(error.localizedDescription)")
+      }
+    } else {
+      UIPasteboard.general.setData(Data(text.utf8), forPasteboardType: self.transcriptionPasteboardType)
+      DiagnosticLog.write("bridge: wrote \(text.count) chars to pasteboard fallback")
     }
     self.postDarwinNotification(DarwinNotificationName.transcriptionReady)
   }
 
+  @MainActor
   static func readTranscription() -> String? {
-    guard let url = transcriptionFileURL else {
-      return nil
+    if let url = transcriptionFileURL {
+      do {
+        let text = try String(contentsOf: url, encoding: .utf8)
+        DiagnosticLog.write("bridge: read \(text.count) chars")
+        return text
+      } catch {
+        DiagnosticLog.write("bridge: READ FAILED: \(error.localizedDescription)")
+        return nil
+      }
     }
-    do {
-      let text = try String(contentsOf: url, encoding: .utf8)
-      DiagnosticLog.write("bridge: read \(text.count) chars")
-      return text
-    } catch {
-      DiagnosticLog.write("bridge: READ FAILED: \(error.localizedDescription)")
-      return nil
-    }
+    guard let data = UIPasteboard.general.data(forPasteboardType: self.transcriptionPasteboardType) else { return nil }
+    let text = String(data: data, encoding: .utf8)
+    DiagnosticLog.write("bridge: read \(text?.count ?? 0) chars from pasteboard fallback")
+    return text
   }
 
+  @MainActor
   static func clearTranscription() {
-    guard let url = transcriptionFileURL else { return }
-    try? Data().write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+    if let url = transcriptionFileURL {
+      try? Data().write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+    } else {
+      UIPasteboard.general.setData(Data(), forPasteboardType: self.transcriptionPasteboardType)
+    }
   }
 
   static func postDarwinNotification(_ name: String) {
@@ -44,6 +56,7 @@ struct TranscriptionBridge: Sendable {
   }
 
   private static let transcriptionFileName = "transcription.txt"
+  private static let transcriptionPasteboardType = "app.sayboard.transcription"
 
   private static var transcriptionFileURL: URL? {
     AppGroup.containerURL?.appendingPathComponent(transcriptionFileName)

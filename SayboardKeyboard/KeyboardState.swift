@@ -145,6 +145,10 @@ final class KeyboardState: ObservableObject {
   }
 
   func startLevelPolling() {
+    guard AppGroup.isAvailable else {
+      self.audioLevel = 0
+      return
+    }
     guard self.displayLink == nil else { return }
     self.lastPolledLevel = 0
     self.lastLevelChangeTime = CACurrentMediaTime()

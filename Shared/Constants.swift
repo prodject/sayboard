@@ -3,12 +3,34 @@ import Foundation
 enum AppGroup {
   static let identifier = "group.app.sayboard.shared"
 
+  static var isAvailable: Bool {
+    self.containerURL != nil
+  }
+
   static var containerURL: URL? {
     FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier)
   }
 
   static var sharedDefaults: UserDefaults? {
     UserDefaults(suiteName: identifier)
+  }
+
+  static var storageContainerURL: URL? {
+    if let containerURL {
+      return containerURL
+    }
+    guard let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+      return nil
+    }
+    let fallback = applicationSupport.appendingPathComponent("Sayboard", isDirectory: true)
+    if !FileManager.default.fileExists(atPath: fallback.path) {
+      try? FileManager.default.createDirectory(
+        at: fallback,
+        withIntermediateDirectories: true,
+        attributes: [.protectionKey: FileProtectionType.completeUnlessOpen],
+      )
+    }
+    return fallback
   }
 }
 
@@ -22,7 +44,33 @@ enum DeepLink {
   static let unlockHost = "unlock"
 
   static var dictateURL: URL? {
-    URL(string: "\(scheme)://\(dictateHost)")
+    self.makeDictateURL(hostBundleId: nil)
+  }
+
+  static func makeDictateURL(hostBundleId: String?) -> URL? {
+    var components = URLComponents()
+    components.scheme = self.scheme
+    components.host = self.dictateHost
+    var queryItems = [URLQueryItem(name: "source", value: "keyboard")]
+    if let hostBundleId, !hostBundleId.isEmpty {
+      queryItems.append(URLQueryItem(name: "host", value: hostBundleId))
+    }
+    components.queryItems = queryItems
+    return components.url
+  }
+
+  static func isKeyboardFallbackURL(_ url: URL) -> Bool {
+    guard !AppGroup.isAvailable else { return false }
+    return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .contains { $0.name == "source" && $0.value == "keyboard" } == true
+  }
+
+  static func hostBundleId(from url: URL) -> String? {
+    URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .first { $0.name == "host" }?
+      .value
   }
 
   static var settingsURL: URL? {

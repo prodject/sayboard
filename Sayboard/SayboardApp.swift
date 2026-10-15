@@ -85,10 +85,13 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
 
 private enum DeepLinkValidator {
   @MainActor
-  static func isFromKeyboard() -> Bool {
+  static func isFromKeyboard(_ url: URL) -> Bool {
     let settings = SharedSettings()
-    if let source = AppDelegate.lastSourceApplication, source == "app.sayboard.keyboard" {
+    if let source = AppDelegate.lastSourceApplication, source.hasSuffix(".keyboard") {
       _ = settings.consumeKeyboardRequestIfRecent()
+      return true
+    }
+    if DeepLink.isKeyboardFallbackURL(url) {
       return true
     }
     return settings.consumeKeyboardRequestIfRecent()
@@ -430,13 +433,16 @@ private struct SayboardRootView: View {
 
     switch url.host {
     case DeepLink.dictateHost:
-      guard DeepLinkValidator.isFromKeyboard() else {
+      guard DeepLinkValidator.isFromKeyboard(url) else {
         return
+      }
+      if let hostBundleId = DeepLink.hostBundleId(from: url) {
+        SharedSettings().hostBundleId = hostBundleId
       }
       self.handleDictateDeepLink()
 
     case DeepLink.stopHost:
-      guard DeepLinkValidator.isFromKeyboard() else {
+      guard DeepLinkValidator.isFromKeyboard(url) else {
         return
       }
       Task { await self.speechService.stopRecording() }
