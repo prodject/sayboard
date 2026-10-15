@@ -80,6 +80,7 @@ final class KeyboardViewController: UIInputViewController {
   }
 
   override func viewWillDisappear(_ animated: Bool) {
+    self.isKeyboardVisible = false
     super.viewWillDisappear(animated)
     if !self.keyboardState.isRecording, !self.keyboardState.isProcessing {
       self.keyboardState.stopLevelPolling()
@@ -87,6 +88,10 @@ final class KeyboardViewController: UIInputViewController {
   }
 
   func insertTranscribedText() {
+    guard AppGroup.isAvailable || self.isKeyboardVisible else {
+      self.hasDeferredAppearanceInsert = true
+      return
+    }
     let text = TranscriptionBridge.readTranscription()
     let _ = text?.isEmpty ?? true
     guard let text, !text.isEmpty else {
@@ -142,6 +147,7 @@ final class KeyboardViewController: UIInputViewController {
   private var lastSyncedFullAccess = false
   private var hasPerformedInitialFullAccessSync = false
   private var hasDeferredAppearanceInsert = false
+  private var isKeyboardVisible = false
   private let pingValidator = PingValidator()
 
   private func syncFullAccessIfChanged() {
@@ -169,7 +175,11 @@ final class KeyboardViewController: UIInputViewController {
         let _ = vc.keyboardState.isProcessing
         vc.cancelProcessingTimeout()
         vc.keyboardState.syncDictationLock()
-        vc.insertTranscribedText()
+        if AppGroup.isAvailable {
+          vc.insertTranscribedText()
+        } else {
+          vc.hasDeferredAppearanceInsert = true
+        }
         vc.finalizeProcessingPipeline()
       }
     }
@@ -232,7 +242,11 @@ final class KeyboardViewController: UIInputViewController {
         vc.keyboardState.isRecording = false
         vc.keyboardState.syncModelLoading()
         vc.keyboardState.syncDictationLock()
-        vc.insertTranscribedText()
+        if AppGroup.isAvailable {
+          vc.insertTranscribedText()
+        } else {
+          vc.hasDeferredAppearanceInsert = true
+        }
         vc.finalizeProcessingPipeline()
       }
     }
@@ -521,6 +535,7 @@ extension KeyboardViewController {
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
+    self.isKeyboardVisible = true
     self.insertDeferredAppearanceText()
   }
 
