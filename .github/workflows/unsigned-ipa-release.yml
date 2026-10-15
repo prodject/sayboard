@@ -1,0 +1,101 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 26.2
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Download llama.cpp XCFramework
+        run: ./scripts/bootstrap-llama.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for iOS without signing
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Sayboard.xcodeproj \
+            -scheme Sayboard \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$RUNNER_TEMP/SayboardDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Package unsigned IPA
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          app_path="$RUNNER_TEMP/SayboardDerivedData/Build/Products/Release-iphoneos/Sayboard.app"
+          test -d "$app_path"
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            version="$TAG_NAME"
+          else
+            version="${SHORT_SHA:0:7}"
+          fi
+
+          ipa_name="Sayboard-${version}-unsigned.ipa"
+          mkdir -p dist/Payload
+          ditto "$app_path" dist/Payload/Sayboard.app
+          (
+            cd dist
+            /usr/bin/zip -qry "$ipa_name" Payload
+          )
+          rm -rf dist/Payload
+
+          test -s "dist/$ipa_name"
+          unzip -l "dist/$ipa_name" | grep -q "Payload/Sayboard.app/Info.plist"
+          echo "IPA_PATH=dist/$ipa_name" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayboard-unsigned-ipa
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$IPA_PATH" --clobber
+          else
+            gh release create "$TAG_NAME" "$IPA_PATH" --verify-tag --generate-notes
+          fi

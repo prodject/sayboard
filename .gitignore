@@ -58,3 +58,6 @@ scripts/tutorials/output/
 # Claude Code
 .claude/*
 !.claude/commands/
+
+# Codebase
+.codebase-memory

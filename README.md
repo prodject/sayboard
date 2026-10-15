@@ -97,6 +97,17 @@ A build you make yourself is the full app: Run, Test and the Release configurati
 
 In the `Sayboard` scheme, only Product › Archive uses the `AppStore` configuration, which compiles the purchase code. To archive a build for your own devices, set `config: Release` under `schemes` › `Sayboard` › `archive` in `project.yml` and run `xcodegen generate` again; a change made in Xcode's scheme editor is lost on the next generate. Otherwise the archive treats your install as a free App Store download, and your own bundle ID has no purchase that could unlock it. The `Sayboard StoreKit` scheme builds that App Store version for Run, Profile, Analyze and Archive, and runs the purchase flow locally against `StoreKit/Sayboard.storekit`.
 
+### Automated Unsigned IPA
+
+The `Build unsigned IPA` GitHub Actions workflow builds the `Release` configuration without code signing. A manual run stores the IPA as a workflow artifact. Pushing a tag whose name starts with `v` also creates a GitHub Release and attaches the IPA:
+
+```sh
+git tag v1.12.1
+git push origin v1.12.1
+```
+
+The resulting IPA is unsigned and cannot be installed as-is on a stock iPhone or iPad. It must be signed with a valid certificate before installation.
+
 ## Bug Reports and Questions
 
 Settings has a Report a Problem section that opens either a prefilled GitHub issue or a prefilled email, whichever you prefer. Both carry the app version, the iOS version and the device identifier, so the report arrives ready to work on.
